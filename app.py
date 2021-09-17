@@ -7,12 +7,13 @@ from flask_sqlalchemy import SQLAlchemy
 import logging
 from logging import Formatter, FileHandler
 from flask_wtf import Form
+from wtforms.validators import ValidationError
 from forms import *
 from flask_migrate import Migrate
 import sys
 from datetime import datetime
 from models import *
-
+from forms import ArtistForm, VenueForm, ShowForm
 
 
 @app.route('/')
@@ -93,7 +94,7 @@ def show_venue(venue_id):
 
 @app.route('/venues/create', methods=['GET'])
 def create_venue_form():
-  form = VenueForm()
+  form = VenueForm(request.form)
   return render_template('forms/new_venue.html', form=form)
 
 @app.route('/venues/create', methods=['POST'])
@@ -116,15 +117,22 @@ def create_venue_submission():
   except :
     seeking_talent = False
   
+  
+
+  
   try:
-        db.session.add(Venue(name=name, city=city, state=state, address=address, phone=phone, image_link=image_link,
-                             genres=genres, facebook_link=facebook_link,website=website, seeking_talent=seeking_talent, seeking_description=seeking_description))
-        db.session.commit()
-        flash('Venue ' + request.form['name'] + ' was successfully listed!')
-  except:
-      flash('An error occurred. Venue ' +
-            request.form['name'] + ' could not be listed.')
-      db.session.rollback()
+    if len(Venue.query.filter_by(name=name).all()) > 0:
+      flash('cannot create the new venue as A Venue with this name already exists.')
+    else :
+      db.session.add(Venue(name=name, city=city, state=state, address=address, phone=phone, image_link=image_link,
+                            genres=genres, facebook_link=facebook_link,website=website, seeking_talent=seeking_talent, seeking_description=seeking_description))
+      
+      db.session.commit()
+      flash('Venue: {0} created successfully'.format(name))
+  except Exception as err:
+    flash('An error occurred creating the Venue: {0}. Error: {1}'.format(name, err))
+    db.session.rollback()
+
  
   return render_template('pages/home.html')
 
@@ -216,11 +224,11 @@ def edit_artist(artist_id):
   form.seeking_description.data = data.seeking_description
   form.image_link.data = data.image_link
 
-  return render_template('forms/edit_artist.html', form=form, artist=artist)
+  return render_template('forms/edit_artist.html', form=form, artist=data)
 
 @app.route('/artists/<int:artist_id>/edit', methods=['POST'])
 def edit_artist_submission(artist_id):
-
+  artist = db.session.query(Artist).get(artist_id)
   artist.name = request.form['name']
   artist.city = request.form['city']
   artist.state = request.form['state']
@@ -238,8 +246,11 @@ def edit_artist_submission(artist_id):
   except :
     artist.seeking_venue = False
   try:
-        db.session.commit()
-        flash('Artist ' + request.form['name'] + ' was successfully Updated!')
+    if len(Artist.query.filter_by(name=artist.name).all()) > 0:
+      flash('cannot update the new Artist as an Artist with this name already exists.')
+    else :
+      db.session.commit()
+      flash('Artist ' + request.form['name'] + ' was successfully Updated!')
   except:
       flash('An error occurred. Artist ' +
             request.form['name'] + ' could not be Updated.')
@@ -286,8 +297,12 @@ def edit_venue_submission(venue_id):
   except :
     venue.seeking_talent = False
   try:
-        db.session.commit()
-        flash('Venue ' + request.form['name'] + ' was successfully Updated!')
+    if len(Venue.query.filter_by(name=venue.name).all()) > 0:
+      flash('cannot update the new Venue as a Venue with this name already exists.')
+    else :
+    
+      db.session.commit()
+      flash('Venue ' + request.form['name'] + ' was successfully Updated!')
   except:
       flash('An error occurred. Venue ' +
             request.form['name'] + ' could not be Updated.')
@@ -319,6 +334,10 @@ def create_artist_submission():
   except :
     seeking_venue = False
   try:
+
+    if len(Artist.query.filter_by(name=name).all()) > 0:
+      flash('cannot create the new Artist as an Artist with this name already exists.')
+    else :
         db.session.add(Artist(name=name, city=city, state=state, phone=phone, image_link=image_link,
                              genres=genres,website=website, facebook_link=facebook_link, seeking_venue=seeking_venue, seeking_description=seeking_description))
         db.session.commit()
